@@ -877,24 +877,6 @@ export class FlipbookViewer {
       console.error('Error updating download button:', error);
     }
   }
-}
-
-interface BookPage {
-  pageNumber: number;
-  image: string;
-  thumbnail: string;
-  width: number;
-  height: number;
-}
-
-interface BookManifest {
-  id: string;
-  title: string;
-  author: string;
-  totalPages: number;
-  coverImage: string;
-  pages: BookPage[];
-}
 
   private deferredPrompt: any = null;
 
@@ -922,3 +904,21 @@ interface BookManifest {
       installPrompt.classList.remove('show');
     }
   }
+}
+
+interface BookPage {
+  pageNumber: number;
+  image: string;
+  thumbnail: string;
+  width: number;
+  height: number;
+}
+
+interface BookManifest {
+  id: string;
+  title: string;
+  author: string;
+  totalPages: number;
+  coverImage: string;
+  pages: BookPage[];
+}
