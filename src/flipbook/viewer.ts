@@ -17,6 +17,10 @@ export class FlipbookViewer {
   private isPanning = false;
   private panStartX = 0;
   private panStartY = 0;
+  private zoomAnimationId: number | null = null;
+  private panAnimationId: number | null = null;
+  private minZoom = 1;
+  private maxZoom = 3;
   
   // Lazy loading
   private loadedPages = new Map<number, HTMLImageElement>();
@@ -73,6 +77,17 @@ export class FlipbookViewer {
 
         <div class="cache-status" id="cacheStatus"></div>
         <div class="offline-message" id="offlineMessage"></div>
+        <div class="install-prompt" id="installPrompt">
+          <div class="install-content">
+            <div class="install-icon">📱</div>
+            <div class="install-text">
+              <h3>Add to Home Screen</h3>
+              <p>Get quick access to your catalog</p>
+            </div>
+            <button class="btn-install" id="btnInstall">Install</button>
+            <button class="btn-dismiss" id="btnDismiss">✕</button>
+          </div>
+        </div>
       </div>
     `;
 
@@ -172,7 +187,9 @@ export class FlipbookViewer {
         cursor: grab;
         user-select: none;
         transform-origin: center;
-        transition: transform 0.1s ease-out;
+        will-change: transform;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
       }
 
       .page-viewer.panning {
@@ -185,6 +202,8 @@ export class FlipbookViewer {
         display: block;
         image-rendering: high-quality;
         will-change: transform;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
       }
 
       .page-controls {
@@ -264,6 +283,7 @@ export class FlipbookViewer {
       }
 
       .thumbnail {
+        width: 100%;
         aspect-ratio: 2/3;
         background: #0d0d0d;
         border: 2px solid #333;
@@ -271,6 +291,9 @@ export class FlipbookViewer {
         cursor: pointer;
         overflow: hidden;
         transition: border-color 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
 
       .thumbnail:hover {
@@ -363,6 +386,86 @@ export class FlipbookViewer {
         }
       }
 
+      .install-prompt {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #333;
+        border: 2px solid #4caf50;
+        border-radius: 8px;
+        padding: 16px;
+        z-index: 400;
+        display: none;
+        max-width: 300px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      }
+
+      .install-prompt.show {
+        display: flex;
+        animation: slideIn 0.3s ease-out;
+      }
+
+      .install-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+      }
+
+      .install-icon {
+        font-size: 32px;
+        flex-shrink: 0;
+      }
+
+      .install-text {
+        flex: 1;
+      }
+
+      .install-text h3 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: #fff;
+      }
+
+      .install-text p {
+        margin: 4px 0 0 0;
+        font-size: 12px;
+        color: #ccc;
+      }
+
+      .btn-install {
+        background: #4caf50;
+        border: none;
+        color: #fff;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        flex-shrink: 0;
+        transition: background 0.2s;
+      }
+
+      .btn-install:hover {
+        background: #45a049;
+      }
+
+      .btn-dismiss {
+        background: transparent;
+        border: none;
+        color: #999;
+        cursor: pointer;
+        font-size: 16px;
+        padding: 0;
+        flex-shrink: 0;
+        transition: color 0.2s;
+      }
+
+      .btn-dismiss:hover {
+        color: #fff;
+      }
+
       @media (max-width: 768px) {
         .flipbook-title {
           font-size: 16px;
@@ -435,6 +538,19 @@ export class FlipbookViewer {
     // Listen for online/offline events
     window.addEventListener('online', () => this.checkOfflineStatus());
     window.addEventListener('offline', () => this.checkOfflineStatus());
+
+    // PWA install prompt
+    const btnInstall = document.getElementById("btnInstall");
+    const btnDismiss = document.getElementById("btnDismiss");
+    if (btnInstall) {
+      btnInstall.addEventListener("click", () => this.installPWA());
+    }
+    if (btnDismiss) {
+      btnDismiss.addEventListener("click", () => this.dismissInstallPrompt());
+    }
+
+    // Listen for beforeinstallprompt event
+    window.addEventListener("beforeinstallprompt", (e: any) => this.handleBeforeInstallPrompt(e));
   }
 
   async loadBook(bookId: string): Promise<void> {
@@ -593,12 +709,12 @@ export class FlipbookViewer {
   }
 
   private zoomIn(): void {
-    this.zoom = Math.min(this.zoom + 0.2, 3);
+    this.zoom = Math.min(this.zoom + 0.2, this.maxZoom);
     this.updatePageTransform();
   }
 
   private zoomOut(): void {
-    this.zoom = Math.max(this.zoom - 0.2, 1);
+    this.zoom = Math.max(this.zoom - 0.2, this.minZoom);
     this.updatePageTransform();
   }
 
@@ -626,7 +742,13 @@ export class FlipbookViewer {
     if (!this.isPanning || this.zoom <= 1) return;
     this.panX = e.clientX - this.panStartX;
     this.panY = e.clientY - this.panStartY;
-    this.updatePageTransform();
+    if (this.panAnimationId !== null) {
+      cancelAnimationFrame(this.panAnimationId);
+    }
+    this.panAnimationId = requestAnimationFrame(() => {
+      this.updatePageTransform();
+      this.panAnimationId = null;
+    });
   }
 
   private endPan(): void {
@@ -638,11 +760,14 @@ export class FlipbookViewer {
   private handleWheel(e: WheelEvent): void {
     if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
-    
+    const oldZoom = this.zoom;
     if (e.deltaY < 0) {
-      this.zoomIn();
+      this.zoom = Math.min(this.zoom + 0.1, this.maxZoom);
     } else {
-      this.zoomOut();
+      this.zoom = Math.max(this.zoom - 0.1, this.minZoom);
+    }
+    if (this.zoom !== oldZoom) {
+      this.updatePageTransform();
     }
   }
 
@@ -651,7 +776,9 @@ export class FlipbookViewer {
     const zoomLevel = document.getElementById('zoomLevel');
     
     if (pageViewer) {
-      pageViewer.style.transform = `scale(${this.zoom}) translate(${this.panX / this.zoom}px, ${this.panY / this.zoom}px)`;
+      const translateX = this.panX / this.zoom;
+      const translateY = this.panY / this.zoom;
+      pageViewer.style.transform = `translate3d(${translateX}px, ${translateY}px, 0) scale(${this.zoom})`;
     }
     
     if (zoomLevel) {
@@ -768,3 +895,30 @@ interface BookManifest {
   coverImage: string;
   pages: BookPage[];
 }
+
+  private deferredPrompt: any = null;
+
+  private handleBeforeInstallPrompt(e: any): void {
+    e.preventDefault();
+    this.deferredPrompt = e;
+    const installPrompt = document.getElementById('installPrompt');
+    if (installPrompt) {
+      installPrompt.classList.add('show');
+    }
+  }
+
+  private async installPWA(): Promise<void> {
+    if (!this.deferredPrompt) return;
+    this.deferredPrompt.prompt();
+    const { outcome } = await this.deferredPrompt.userChoice;
+    console.log(`User response: ${outcome}`);
+    this.deferredPrompt = null;
+    this.dismissInstallPrompt();
+  }
+
+  private dismissInstallPrompt(): void {
+    const installPrompt = document.getElementById('installPrompt');
+    if (installPrompt) {
+      installPrompt.classList.remove('show');
+    }
+  }
