@@ -1,64 +1,42 @@
-const CACHE_VERSION = 'v1';
-const RUNTIME_CACHE = `flipbook-runtime-${CACHE_VERSION}`;
-const ASSET_CACHE = `flipbook-assets-${CACHE_VERSION}`;
-const CACHE_PREFIX = 'flipbook-cache-';
+const CACHE_NAME = 'flipbook-pwa-v1';
+const RUNTIME_CACHE = 'flipbook-runtime-v1';
+const ASSET_CACHE = 'flipbook-assets-v1';
 
 const ASSETS_TO_CACHE = [
-  '/HighPowerCatalog/',
-  '/HighPowerCatalog/index.html',
+  '/',
+  '/index.html',
+  '/manifest.webmanifest',
 ];
 
 // Install event: cache essential assets
 self.addEventListener('install', event => {
-  console.log('[SW] Installing service worker...');
-  
   event.waitUntil(
-    caches.open(ASSET_CACHE).then(cache => {
-      console.log('[SW] Caching essential assets');
-      return cache.addAll(ASSETS_TO_CACHE).catch(error => {
-        console.warn('[SW] Some assets failed to cache:', error);
-      });
-    })
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(ASSETS_TO_CACHE))
+      .then(() => self.skipWaiting())
   );
-  
-  self.skipWaiting();
 });
 
 // Activate event: clean up old caches
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating service worker...');
-  
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (
-            cacheName !== RUNTIME_CACHE &&
-            cacheName !== ASSET_CACHE &&
-            !cacheName.startsWith(CACHE_PREFIX)
-          ) {
-            console.log('[SW] Deleting old cache:', cacheName);
+          if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE && cacheName !== ASSET_CACHE) {
             return caches.delete(cacheName);
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  
-  self.clients.claim();
 });
 
 // Fetch event: implement caching strategies
 self.addEventListener('fetch', event => {
-  const { request } = event;
-  const url = new URL(request.url);
+  const url = new URL(event.request.url);
 
-  // Skip non-GET requests
-  if (request.method !== 'GET') {
-    return;
-  }
-
-  // Skip chrome extensions and other non-http requests
+  // Skip non-HTTP requests
   if (!url.protocol.startsWith('http')) {
     return;
   }
@@ -66,17 +44,20 @@ self.addEventListener('fetch', event => {
   // Strategy for manifest.json files: network first, fallback to cache
   if (url.pathname.includes('/manifest.json')) {
     event.respondWith(
-      fetch(request)
+      fetch(event.request)
         .then(response => {
-          if (response.ok) {
-            const cache = caches.open(RUNTIME_CACHE);
-            cache.then(c => c.put(request, response.clone()));
-            return response.clone();
+          if (!response.ok) {
+            return response;
           }
+          // Clone response: one for cache, one to return
+          const responseToCache = response.clone();
+          caches.open(RUNTIME_CACHE).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
           return response;
         })
         .catch(() => {
-          return caches.match(request).then(cached => {
+          return caches.match(event.request).then(cached => {
             return cached || new Response('Offline - manifest not available', {
               status: 503,
               statusText: 'Service Unavailable',
@@ -90,17 +71,20 @@ self.addEventListener('fetch', event => {
   // Strategy for book pages and thumbnails: cache first, fallback to network
   if (url.pathname.includes('/books/')) {
     event.respondWith(
-      caches.match(request).then(cached => {
+      caches.match(event.request).then(cached => {
         if (cached) {
           return cached;
         }
-        return fetch(request)
+        return fetch(event.request)
           .then(response => {
-            if (response.ok && request.method === 'GET') {
-              const cache = caches.open(RUNTIME_CACHE);
-              cache.then(c => c.put(request, response.clone()));
-              return response.clone();
+            if (!response.ok || event.request.method !== 'GET') {
+              return response;
             }
+            // Clone response: one for cache, one to return
+            const responseToCache = response.clone();
+            caches.open(RUNTIME_CACHE).then(cache => {
+              cache.put(event.request, responseToCache);
+            });
             return response;
           })
           .catch(() => {
@@ -116,13 +100,16 @@ self.addEventListener('fetch', event => {
 
   // Strategy for other assets: stale-while-revalidate
   event.respondWith(
-    caches.match(request).then(cached => {
-      const fetchPromise = fetch(request).then(response => {
-        if (response.ok && request.method === 'GET') {
-          const cache = caches.open(ASSET_CACHE);
-          cache.then(c => c.put(request, response.clone()));
-          return response.clone();
+    caches.match(event.request).then(cached => {
+      const fetchPromise = fetch(event.request).then(response => {
+        if (!response.ok || event.request.method !== 'GET') {
+          return response;
         }
+        // Clone response: one for cache, one to return
+        const responseToCache = response.clone();
+        caches.open(ASSET_CACHE).then(cache => {
+          cache.put(event.request, responseToCache);
+        });
         return response;
       });
 
@@ -137,13 +124,58 @@ self.addEventListener('message', event => {
     self.skipWaiting();
   }
 
-  if (event.data && event.data.type === 'GET_CACHE_STATUS') {
-    caches.keys().then(cacheNames => {
-      const offlineCaches = cacheNames.filter(name => name.startsWith(CACHE_PREFIX));
-      event.ports[0].postMessage({
-        type: 'CACHE_STATUS',
-        offlineCaches,
-      });
-    });
+  if (event.data && event.data.type === 'CACHE_BOOK') {
+    const { bookId, pages } = event.data;
+    cacheBook(bookId, pages, event.ports[0]);
   }
 });
+
+// Cache a book for offline use
+async function cacheBook(bookId, pages, port) {
+  try {
+    const cache = await caches.open(RUNTIME_CACHE);
+    const baseUrl = self.location.origin + self.location.pathname.replace(/\/$/, '');
+
+    // Cache manifest
+    const manifestUrl = `${baseUrl}/books/${bookId}/manifest.json`;
+    try {
+      const manifestResponse = await fetch(manifestUrl);
+      if (manifestResponse.ok) {
+        await cache.put(manifestUrl, manifestResponse.clone());
+      }
+    } catch (err) {
+      console.error('Failed to cache manifest:', err);
+    }
+
+    // Cache all pages and thumbnails
+    let cached = 0;
+    for (const page of pages) {
+      try {
+        const pageUrl = `${baseUrl}/${page.image}`;
+        const thumbUrl = `${baseUrl}/${page.thumbnail}`;
+
+        const [pageResponse, thumbResponse] = await Promise.all([
+          fetch(pageUrl),
+          fetch(thumbUrl),
+        ]);
+
+        if (pageResponse.ok) {
+          await cache.put(pageUrl, pageResponse.clone());
+        }
+        if (thumbResponse.ok) {
+          await cache.put(thumbUrl, thumbResponse.clone());
+        }
+
+        cached++;
+        port.postMessage({ type: 'CACHE_PROGRESS', cached, total: pages.length * 2 });
+      } catch (err) {
+        console.error(`Failed to cache page ${page.pageNumber}:`, err);
+      }
+    }
+
+    port.postMessage({ type: 'CACHE_COMPLETE', success: true });
+  } catch (error) {
+    console.error('Error caching book:', error);
+    port.postMessage({ type: 'CACHE_COMPLETE', success: false, error: error.message });
+  }
+}
