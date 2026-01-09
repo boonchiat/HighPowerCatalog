@@ -1,0 +1,19 @@
+{
+  "name": "highpower-flipbook-pwa",
+  "version": "1.0.0",
+  "description": "Standalone flipbook PWA viewer for HighPower Catalog",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "workbox-window": "^7.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^1.1.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8"
+  }
+}
