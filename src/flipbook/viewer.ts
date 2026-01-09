@@ -728,6 +728,28 @@ export class FlipbookViewer {
       offlineMsg.classList.add('show');
     }
   }
+
+  private async updateDownloadButton(): Promise<void> {
+    if (!this.manifest) return;
+
+    const btnDownload = document.getElementById('btnDownload') as HTMLButtonElement;
+    if (!btnDownload) return;
+
+    try {
+      const isCached = await this.cacheManager.isBookCached(this.manifest.id);
+      if (isCached) {
+        btnDownload.textContent = '✓';
+        btnDownload.disabled = true;
+        btnDownload.title = 'Book is cached for offline';
+      } else {
+        btnDownload.textContent = '⬇';
+        btnDownload.disabled = false;
+        btnDownload.title = 'Download for Offline';
+      }
+    } catch (error) {
+      console.error('Error updating download button:', error);
+    }
+  }
 }
 
 interface BookPage {
