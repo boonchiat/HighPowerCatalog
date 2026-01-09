@@ -236,7 +236,8 @@ export class FlipbookViewer {
       .thumbnail img {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        object-fit: contain;
+        background: #0d0d0d;
       }
 
       .cache-status {
