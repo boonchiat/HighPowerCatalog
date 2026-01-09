@@ -108,7 +108,7 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// Handle messages from clients
+// Handle messages from clients for offline caching
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
@@ -116,7 +116,10 @@ self.addEventListener('message', event => {
 
   if (event.data && event.data.type === 'CACHE_BOOK') {
     const { bookId, pages } = event.data;
-    cacheBook(bookId, pages, event.ports[0]);
+    // event.ports[0] is the port to send messages back
+    if (event.ports && event.ports.length > 0) {
+      cacheBook(bookId, pages, event.ports[0]);
+    }
   }
 });
 
@@ -139,10 +142,12 @@ async function cacheBook(bookId, pages, port) {
 
     // Cache all pages and thumbnails
     let cached = 0;
+    const totalItems = pages.length * 2; // pages + thumbnails
+    
     for (const page of pages) {
       try {
-        const pageUrl = `${baseUrl}/${page.image}`;
-        const thumbUrl = `${baseUrl}/${page.thumbnail}`;
+        const pageUrl = `${baseUrl}/books/${bookId}/${page.image}`;
+        const thumbUrl = `${baseUrl}/books/${bookId}/${page.thumbnail}`;
 
         const [pageResponse, thumbResponse] = await Promise.all([
           fetch(pageUrl),
@@ -151,15 +156,18 @@ async function cacheBook(bookId, pages, port) {
 
         if (pageResponse.ok) {
           await cache.put(pageUrl, pageResponse.clone());
+          cached++;
+          port.postMessage({ type: 'CACHE_PROGRESS', cached, total: totalItems });
         }
+        
         if (thumbResponse.ok) {
           await cache.put(thumbUrl, thumbResponse.clone());
+          cached++;
+          port.postMessage({ type: 'CACHE_PROGRESS', cached, total: totalItems });
         }
-
-        cached++;
-        port.postMessage({ type: 'CACHE_PROGRESS', cached, total: pages.length * 2 });
       } catch (err) {
         console.error(`Failed to cache page ${page.pageNumber}:`, err);
+        // Continue caching other pages even if one fails
       }
     }
 
