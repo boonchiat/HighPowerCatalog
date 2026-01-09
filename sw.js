@@ -2,19 +2,9 @@ const CACHE_NAME = 'flipbook-pwa-v1';
 const RUNTIME_CACHE = 'flipbook-runtime-v1';
 const ASSET_CACHE = 'flipbook-assets-v1';
 
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-];
-
-// Install event: cache essential assets
+// Install event: skip waiting, don't pre-cache (will be cached on first use)
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(ASSETS_TO_CACHE))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(self.skipWaiting());
 });
 
 // Activate event: clean up old caches
