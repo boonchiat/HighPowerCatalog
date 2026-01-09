@@ -1,0 +1,23 @@
+{
+  "id": "catalog_11-12-25",
+  "title": "HIGH POWER Catalogue 11-12-25",
+  "version": "11-12-25",
+  "pageCount": 15,
+  "pages": [
+    { "n": 1, "src": "pages/p01.webp", "thumb": "thumbs/t01.webp" },
+    { "n": 2, "src": "pages/p02.webp", "thumb": "thumbs/t02.webp" },
+    { "n": 3, "src": "pages/p03.webp", "thumb": "thumbs/t03.webp" },
+    { "n": 4, "src": "pages/p04.webp", "thumb": "thumbs/t04.webp" },
+    { "n": 5, "src": "pages/p05.webp", "thumb": "thumbs/t05.webp" },
+    { "n": 6, "src": "pages/p06.webp", "thumb": "thumbs/t06.webp" },
+    { "n": 7, "src": "pages/p07.webp", "thumb": "thumbs/t07.webp" },
+    { "n": 8, "src": "pages/p08.webp", "thumb": "thumbs/t08.webp" },
+    { "n": 9, "src": "pages/p09.webp", "thumb": "thumbs/t09.webp" },
+    { "n": 10, "src": "pages/p10.webp", "thumb": "thumbs/t10.webp" },
+    { "n": 11, "src": "pages/p11.webp", "thumb": "thumbs/t11.webp" },
+    { "n": 12, "src": "pages/p12.webp", "thumb": "thumbs/t12.webp" },
+    { "n": 13, "src": "pages/p13.webp", "thumb": "thumbs/t13.webp" },
+    { "n": 14, "src": "pages/p14.webp", "thumb": "thumbs/t14.webp" },
+    { "n": 15, "src": "pages/p15.webp", "thumb": "thumbs/t15.webp" }
+  ]
+}
