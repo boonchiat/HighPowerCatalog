@@ -71,6 +71,7 @@ self.addEventListener('fetch', event => {
           if (response.ok) {
             const cache = caches.open(RUNTIME_CACHE);
             cache.then(c => c.put(request, response.clone()));
+            return response.clone();
           }
           return response;
         })
@@ -98,6 +99,7 @@ self.addEventListener('fetch', event => {
             if (response.ok && request.method === 'GET') {
               const cache = caches.open(RUNTIME_CACHE);
               cache.then(c => c.put(request, response.clone()));
+              return response.clone();
             }
             return response;
           })
@@ -119,6 +121,7 @@ self.addEventListener('fetch', event => {
         if (response.ok && request.method === 'GET') {
           const cache = caches.open(ASSET_CACHE);
           cache.then(c => c.put(request, response.clone()));
+          return response.clone();
         }
         return response;
       });

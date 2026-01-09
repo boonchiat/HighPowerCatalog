@@ -326,6 +326,10 @@ export class FlipbookViewer {
       }
 
       this.manifest = await response.json();
+      console.log('Manifest loaded:', this.manifest);
+      if (this.manifest.pages && this.manifest.pages.length > 0) {
+        console.log('First page object:', this.manifest.pages[0]);
+      }
       this.currentPageIndex = 0;
       this.renderPage();
       this.renderThumbnails();
@@ -339,10 +343,18 @@ export class FlipbookViewer {
   }
 
   private renderPage(): void {
-    if (!this.manifest) return;
+    if (!this.manifest) {
+      console.error('No manifest loaded');
+      return;
+    }
 
     const page = this.manifest.pages[this.currentPageIndex];
-    if (!page) return;
+    console.log('Current page index:', this.currentPageIndex);
+    console.log('Page object:', page);
+    if (!page) {
+      console.error('Page not found at index:', this.currentPageIndex);
+      return;
+    }
 
     const pageImage = document.getElementById('pageImage') as HTMLImageElement;
     const pageCounter = document.getElementById('pageCounter');
