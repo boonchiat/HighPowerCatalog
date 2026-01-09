@@ -1,13 +1,29 @@
 {
   "name": "HighPower Flipbook Catalog",
   "short_name": "HP Catalog",
-  "description": "View HighPower product catalogs as interactive flipbooks",
-  "start_url": "/HighPowerCatalog/",
+  "description": "View HighPower product catalogs as interactive flipbooks with offline support",
+  "start_url": "/HighPowerCatalog/?book=catalog_11-12-25",
   "scope": "/HighPowerCatalog/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#1a1a1a",
-  "theme_color": "#1a1a1a",
+  "theme_color": "#4caf50",
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Open Catalog",
+      "short_name": "Catalog",
+      "description": "Open the HighPower catalog",
+      "url": "/HighPowerCatalog/?book=catalog_11-12-25",
+      "icons": [
+        {
+          "src": "/HighPowerCatalog/icons/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
   "icons": [
     {
       "src": "/HighPowerCatalog/icons/icon-192x192.png",
